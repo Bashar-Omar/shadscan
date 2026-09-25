@@ -678,4 +678,84 @@ describe("interaction rules", () => {
       await fixture.cleanup();
     }
   });
+
+  it("recognizes a focus replacement on the immediate wrapper", async () => {
+    const fixture = await createRuleFixture();
+
+    try {
+      await fixture.write(
+        "src/search.tsx",
+        `
+          export function Search() {
+            return (
+              <label className="inline-flex items-center has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+                <span>Search</span>
+                <input className="outline-none" type="search" />
+              </label>
+            );
+          }
+        `
+      );
+
+      expect(
+        (await runRule(fixture.rootDir, focusVisibleNotSuppressedRule)).status
+      ).toBe("pass");
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("does not treat focus-visible styles on a non-focusable wrapper as a replacement", async () => {
+    const fixture = await createRuleFixture();
+
+    try {
+      await fixture.write(
+        "src/search.tsx",
+        `
+          export function Search() {
+            return (
+              <label className="inline-flex items-center focus-visible:ring-2">
+                <span>Search</span>
+                <input className="outline-none" type="search" />
+              </label>
+            );
+          }
+        `
+      );
+
+      expect(
+        (await runRule(fixture.rootDir, focusVisibleNotSuppressedRule)).status
+      ).toBe("fail");
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("does not use a distant ancestor as the focus replacement", async () => {
+    const fixture = await createRuleFixture();
+
+    try {
+      await fixture.write(
+        "src/search.tsx",
+        `
+          export function Search() {
+            return (
+              <div className="has-[:focus-visible]:ring-2">
+                <label className="inline-flex items-center">
+                  <span>Search</span>
+                  <input className="outline-none" type="search" />
+                </label>
+              </div>
+            );
+          }
+        `
+      );
+
+      expect(
+        (await runRule(fixture.rootDir, focusVisibleNotSuppressedRule)).status
+      ).toBe("fail");
+    } finally {
+      await fixture.cleanup();
+    }
+  });
 });
