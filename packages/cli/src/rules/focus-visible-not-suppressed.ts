@@ -2,6 +2,7 @@ import {
   createSourceFile,
   forEachChild,
   isJsxAttribute,
+  isJsxElement,
   isJsxExpression,
   isJsxOpeningElement,
   isJsxSelfClosingElement,
@@ -23,6 +24,8 @@ import {
 
 const FOCUS_REPLACEMENT_PATTERN =
   /focus-visible:(?:ring|outline|border|shadow)|focus:(?:ring|outline|border|shadow)/;
+const WRAPPER_FOCUS_REPLACEMENT_PATTERN =
+  /(?:^|:)has-\[:focus-visible\]:(?:ring|outline|border|shadow)/;
 const CSS_RULE_PATTERN = /([^{}]+)\{([^{}]*)\}/g;
 const CSS_OUTLINE_REMOVAL_PATTERN = /outline\s*:\s*(?:none|0)\s*;/i;
 const CSS_VISIBLE_PROPERTY_PATTERN =
@@ -145,6 +148,27 @@ const suppressesOwnOutline = (classValue: string): boolean =>
     return !className.includes("[") && className.endsWith(":outline-none");
   });
 
+const getImmediateJsxWrapper = (
+  node: JsxOpeningLikeElement
+): JsxOpeningLikeElement | null => {
+  const element = isJsxOpeningElement(node) ? node.parent : node;
+  const parent = element.parent;
+
+  return isJsxElement(parent) ? parent.openingElement : null;
+};
+
+const hasWrapperFocusReplacement = (node: JsxOpeningLikeElement): boolean => {
+  const wrapper = getImmediateJsxWrapper(node);
+
+  if (!wrapper) {
+    return false;
+  }
+
+  return getStaticClassValue(wrapper)
+    .split(CLASS_SEPARATOR_PATTERN)
+    .some((className) => WRAPPER_FOCUS_REPLACEMENT_PATTERN.test(className));
+};
+
 const isPotentialFocusTarget = (node: JsxOpeningLikeElement): boolean => {
   const tagName = getJsxTagName(node);
 
@@ -198,7 +222,8 @@ const findSourceOutlineSuppression = (file: SourceFile): number | null => {
       if (
         isPotentialFocusTarget(node) &&
         suppressesOwnOutline(classValue) &&
-        !FOCUS_REPLACEMENT_PATTERN.test(classValue)
+        !FOCUS_REPLACEMENT_PATTERN.test(classValue) &&
+        !hasWrapperFocusReplacement(node)
       ) {
         suppressionLine =
           sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
