@@ -758,4 +758,38 @@ describe("interaction rules", () => {
       await fixture.cleanup();
     }
   });
+
+  it.each([
+    "hover:has-[:focus-visible]:ring-2",
+    "sm:has-[:focus-visible]:ring-2",
+    "has-[:focus-visible]:ring-0",
+    "has-[:focus-visible]:shadow-none",
+    "has-[:focus-visible]:ring-offset-2",
+  ])(
+    "does not treat %s as a visible wrapper focus replacement",
+    async (wrapperClass) => {
+      const fixture = await createRuleFixture();
+
+      try {
+        await fixture.write(
+          "src/search.tsx",
+          `
+            export function Search() {
+              return (
+                <label className={${JSON.stringify(wrapperClass)}}>
+                  <input className="outline-none" type="search" />
+                </label>
+              );
+            }
+          `
+        );
+
+        expect(
+          (await runRule(fixture.rootDir, focusVisibleNotSuppressedRule)).status
+        ).toBe("fail");
+      } finally {
+        await fixture.cleanup();
+      }
+    }
+  );
 });
